@@ -29,9 +29,10 @@ resource "aws_s3_bucket" "taskstorage" {
 }
 
 # Configuración de DynamoDB
-resource "aws_dynamodb_table" "tasks" {
+resource "aws_dynamodb_table" "DynamoDB" {
   name           = "DynamoDB"
   billing_mode   = "PAY_PER_REQUEST"
+  hash_key       = "task_id"
 
   attribute {
     name = "task_id"
@@ -75,7 +76,7 @@ resource "aws_lambda_function" "create_scheduled_task" {
 
   environment {
     variables = {
-      DYNAMODB_TABLE_NAME = aws_dynamodb_table.tasks.name
+      DYNAMODB_TABLE_NAME = "DynamoDB"
     }
   }
 }
@@ -201,7 +202,7 @@ resource "aws_api_gateway_integration" "create_task_integration" {
   resource_id             = aws_api_gateway_resource.create_task_resource.id
   http_method             = aws_api_gateway_method.create_task_method.http_method
   integration_http_method = "POST"
-  type                    = "AWS_PROXY"
+  type                    = "AWS"
   uri                     = aws_lambda_function.create_scheduled_task.invoke_arn
 }
 
@@ -210,6 +211,6 @@ resource "aws_api_gateway_integration" "list_task_integration" {
   resource_id             = aws_api_gateway_resource.list_task_resource.id
   http_method             = aws_api_gateway_method.list_task_method.http_method
   integration_http_method = "GET"
-  type                    = "AWS_PROXY"
+  type                    = "AWS"
   uri                     = aws_lambda_function.list_scheduled_task.invoke_arn
 }

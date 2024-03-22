@@ -2,7 +2,7 @@ import json
 import boto3
 
 ddb = boto3.resource('dynamodb', endpoint_url='http://localhost:4566')
-table = ddb.Table('DynamoDB')
+table = ddb.Table(TableName='DynamoDB')
 
 def listScheduledTask(event, context):
     response = table.scan()
