@@ -3,7 +3,7 @@ import boto3
 import uuid
 
 ddb = boto3.resource('dynamodb', endpoint_url='http://localhost:4566')
-table = ddb.Table('task_db')
+table = ddb.Table('DynamoDB')
 
 def createScheduledTask(event, context):
     data = json.loads(event['body'])

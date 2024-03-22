@@ -31,7 +31,7 @@ You can check the hackathon details here: [here](challenge.md).
 # How to run
 1. Run a LocalStack container (from another terminal).
     ```bash
-    docker run --rm -it -p 4566:4566 -p 4571:4571 localstack/localstack
+    docker run --rm -it -p 4566:4566 -p 4571:4571 -v /var/run/docker.sock:/var/run/docker.sock localstack/localstack
     ```
 2. Move to the Terraform folder
     ```bash

@@ -1,5 +1,5 @@
 env/
 Infraestructure/Terraform/.terraform/
 Infraestructure/Terraform/.terraform.lock.hcl
-Infraestructure/Terraform/terraform.tfstate
-Infraestructure/Terraform/terraform.tfstate.backup
+Infraestructure/Terraform/terraform.tfstat*
+Infraestructure/Lambda/*.zip

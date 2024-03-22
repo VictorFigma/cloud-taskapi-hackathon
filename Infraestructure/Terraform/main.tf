@@ -18,5 +18,133 @@ provider "aws" {
   }
 }
 
-# Add here all the infraestructure logic
+# TASK API
+# API Gateway
+resource "aws_api_gateway_rest_api" "task_api" {
+  name        = "TaskAPI"
+  description = "API Gateway for TaskAPI"
+}
 
+resource "aws_api_gateway_resource" "create_task_resource" {
+  rest_api_id = aws_api_gateway_rest_api.task_api.id
+  parent_id   = aws_api_gateway_rest_api.task_api.root_resource_id
+  path_part   = "createtask"
+}
+
+resource "aws_api_gateway_method" "create_task_method" {
+  rest_api_id   = aws_api_gateway_rest_api.task_api.id
+  resource_id   = aws_api_gateway_resource.create_task_resource.id
+  http_method   = "POST"
+  authorization = "NONE"
+}
+
+resource "aws_lambda_permission" "apigw_lambda" {
+  statement_id  = "AllowExecutionFromAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.create_scheduled_task.function_name
+  principal     = "apigateway.amazonaws.com"
+
+  source_arn = "${aws_api_gateway_rest_api.task_api.execution_arn}/*/*"
+}
+
+resource "aws_api_gateway_integration" "create_task_integration" {
+  rest_api_id             = aws_api_gateway_rest_api.task_api.id
+  resource_id             = aws_api_gateway_resource.create_task_resource.id
+  http_method             = aws_api_gateway_method.create_task_method.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.create_scheduled_task.invoke_arn
+}
+
+resource "aws_api_gateway_resource" "list_task_resource" {
+  rest_api_id = aws_api_gateway_rest_api.task_api.id
+  parent_id   = aws_api_gateway_rest_api.task_api.root_resource_id
+  path_part   = "listtask"
+}
+
+resource "aws_api_gateway_method" "list_task_method" {
+  rest_api_id   = aws_api_gateway_rest_api.task_api.id
+  resource_id   = aws_api_gateway_resource.list_task_resource.id
+  http_method   = "GET"
+  authorization = "NONE"
+}
+
+# DynamoDB
+resource "aws_dynamodb_table" "tasks" {
+  name           = "DynamoDB"
+  billing_mode   = "PAY_PER_REQUEST"
+  hash_key       = "task_id"
+  attribute {
+    name = "task_id"
+    type = "S"
+  }
+  attribute {
+    name = "task_name"
+    type = "S"
+  }
+  attribute {
+    name = "cron_expression"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name               = "TaskNameIndex"
+    hash_key           = "task_name"
+    projection_type    = "ALL"
+    read_capacity      = 1
+    write_capacity     = 1
+  }
+
+  global_secondary_index {
+    name               = "CronExpressionIndex"
+    hash_key           = "cron_expression"
+    projection_type    = "ALL"
+    read_capacity      = 1
+    write_capacity     = 1
+  }
+}
+
+# POST LAMBDA
+resource "aws_lambda_function" "create_scheduled_task" {
+  filename      = "${path.module}/../lambda/createScheduledTask.zip"
+  function_name = "createScheduledTask"
+  role          = aws_iam_role.lambda_exec.arn
+  handler       = "createScheduledTask.lambda_handler"
+  runtime       = "python3.8"
+
+  environment {
+    variables = {
+      DYNAMODB_TABLE_NAME = aws_dynamodb_table.tasks.name
+    }
+  }
+}
+
+data "archive_file" "lambda_zip" {
+  type        = "zip"
+  source_file = "${path.module}/../lambda/post.py"
+  output_path = "${path.module}/../lambda/createScheduledTask.zip"
+}
+
+
+resource "aws_iam_role" "lambda_exec" {
+  name = "lambda_exec_role"
+  assume_role_policy = file("lambda-policy.json")
+}
+
+resource "aws_iam_policy_attachment" "lambda_dynamodb_access" {
+  name       = "lambda-dynamodb-access"
+  roles      = [aws_iam_role.lambda_exec.name]
+  policy_arn = "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess"
+}
+/*
+resource "aws_iam_policy" "lambda_policy" {
+  name        = "lambda_policy"
+  description = "Policy for Lambda function to interact with DynamoDB"
+
+  policy = file("${path.module}/policy.json")
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_policy_attachment" {
+  policy_arn = aws_iam_policy.lambda_policy.arn
+  role       = aws_iam_role.lambda_role.name
+}*/
