@@ -66,6 +66,25 @@ resource "aws_dynamodb_table" "DynamoDB" {
   }
 }
 
+# Data zip
+data "archive_file" "create_lambda_zip" {
+  type        = "zip"
+  source_file = "${path.module}/../lambda/createScheduledTask.py"
+  output_path = "${path.module}/../lambda/createScheduledTask.zip"
+}
+
+data "archive_file" "list_lambda_zip" {
+  type        = "zip"
+  source_file = "${path.module}/../lambda/listScheduledTask.py"
+  output_path = "${path.module}/../lambda/listScheduledTask.zip"
+}
+
+data "archive_file" "execute_lambda_zip" {
+  type        = "zip"
+  source_file =  "${path.module}/../lambda/executeScheduledTask.py"
+  output_path =  "${path.module}/../lambda/executeScheduledTask.zip"
+}
+
 # Configuración de Lambda
 resource "aws_lambda_function" "create_scheduled_task" {
   filename      = "${path.module}/../lambda/createScheduledTask.zip"
@@ -100,7 +119,7 @@ resource "aws_lambda_function" "execute_scheduled_task" {
 # Configuración de IAM
 resource "aws_iam_role" "lambda_exec" {
   name               = "lambda_exec_role"
-  assume_role_policy = file("lambda-policy.json")
+  assume_role_policy = file("${path.module}/lambda-policy.json")
 }
 
 resource "aws_iam_policy" "lambda_policy_db_access" {
@@ -112,13 +131,13 @@ resource "aws_iam_policy" "lambda_policy_db_access" {
 resource "aws_iam_policy" "list_lambda_policy" {
   name        = "list_lambda_policy"
   description = "Policy for Lambda function to read from DynamoDB"
-  policy      = file("scan-policy.json")
+  policy      = file("${path.module}/scan-policy.json")
 }
 
 resource "aws_iam_policy" "execute_lambda_policy" {
   name        = "execute_lambda_policy"
   description = "Policy for Lambda function to write to S3"
-  policy      = file("event-policy.json")
+  policy      = file("${path.module}/event-policy.json")
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_policy_attachment" {
