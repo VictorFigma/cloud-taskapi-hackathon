@@ -90,7 +90,7 @@ resource "aws_lambda_function" "list_scheduled_task" {
   filename      = "${path.module}/../lambda/listScheduledTask.zip"
   function_name = "listScheduledTask"
   role          = aws_iam_role.lambda_exec.arn
-  handler       = "get.listScheduledTask"
+  handler       = "listScheduledTask.listScheduledTask"
   runtime       = "python3.8"
 }
 
@@ -109,7 +109,38 @@ resource "aws_iam_policy" "list_lambda_policy" {
 
 resource "aws_iam_role_policy_attachment" "list_lambda_policy_attachment" {
   policy_arn = aws_iam_policy.list_lambda_policy.arn
-  role       = aws_iam_role.lambda_exec.name  # Corrected role name
+  role       = aws_iam_role.lambda_exec.name
+}
+
+resource "aws_lambda_function" "execute_scheduled_task" {
+  filename      = "${path.module}/../lambda/executeScheduledTask.zip"
+  function_name = "executeScheduledTask"
+  role          = aws_iam_role.lambda_exec.arn
+  handler       = "executeScheduledTask.executeScheduledTask"
+  runtime       = "python3.8"
+}
+
+data "archive_file" "execute_lambda_zip" {
+  type        = "zip"
+  source_file =  "${path.module}/../lambda/executeScheduledTask.py"
+  output_path =  "${path.module}/../lambda/executeScheduledTask.zip"
+}
+
+resource "aws_iam_policy" "execute_lambda_policy" {
+  name        = "execute_lambda_policy"
+  description = "Policy for Lambda function to write to S3"
+
+  policy = file("event-policy.json")
+}
+
+resource "aws_cloudwatch_event_rule" "every_minute_rule" {
+  name                = "every-minute"
+  schedule_expression = "rate(1 minute)"
+}
+
+resource "aws_cloudwatch_event_target" "execute_scheduled_task_target" {
+  rule = aws_cloudwatch_event_rule.every_minute_rule.name
+  arn  = aws_lambda_function.execute_scheduled_task.arn
 }
 
 # TASK API
