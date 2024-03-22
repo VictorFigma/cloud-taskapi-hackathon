@@ -6,7 +6,7 @@ s3 = boto3.client('s3', endpoint_url='http://localhost:4566')
 
 def lambda_handler(event, context):
     bucket_name = 'taskstorage'
-    object_key = f"task_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.txt"
+    object_key = f"task_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.txt"
     s3.put_object(Bucket=bucket_name, Key=object_key, Body="New task created")
 
     return {

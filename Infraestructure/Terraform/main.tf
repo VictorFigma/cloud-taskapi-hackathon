@@ -1,3 +1,4 @@
+# Configuración de proveedor
 provider "aws" {
   access_key                  = "test"
   secret_key                  = "test"
@@ -18,19 +19,30 @@ provider "aws" {
   }
 }
 
-# DynamoDB
+# Configuración de S3 Bucket
+resource "aws_s3_bucket" "taskstorage" {
+  bucket = "taskstorage"
+
+  tags = {
+    Name = "taskstorage"
+  }
+}
+
+# Configuración de DynamoDB
 resource "aws_dynamodb_table" "tasks" {
   name           = "DynamoDB"
   billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "task_id"
+
   attribute {
     name = "task_id"
     type = "S"
   }
+
   attribute {
     name = "task_name"
     type = "S"
   }
+
   attribute {
     name = "cron_expression"
     type = "S"
@@ -53,58 +65,64 @@ resource "aws_dynamodb_table" "tasks" {
   }
 }
 
-# POST LAMBDA
+# Configuración de Lambda
 resource "aws_lambda_function" "create_scheduled_task" {
   filename      = "${path.module}/../lambda/createScheduledTask.zip"
   function_name = "createScheduledTask"
   role          = aws_iam_role.lambda_exec.arn
-  handler       = "createScheduledTask.createScheduledTask"
+  handler       = "createScheduledTask.lambda_handler"
   runtime       = "python3.8"
 
   environment {
     variables = {
-      DYNAMODB_TABLE_NAME = "DynamoDB"
+      DYNAMODB_TABLE_NAME = aws_dynamodb_table.tasks.name
     }
   }
 }
 
-data "archive_file" "lambda_zip" {
-  type        = "zip"
-  source_file = "${path.module}/../lambda/createScheduledTask.py"
-  output_path = "${path.module}/../lambda/createScheduledTask.zip"
-}
-
-resource "aws_iam_role" "lambda_exec" {
-  name = "lambda_exec_role"
-  assume_role_policy = file("lambda-policy.json")
-}
-
-resource "aws_iam_policy_attachment" "lambda_dynamodb_access" {
-  name       = "lambda-dynamodb-access"
-  roles      = [aws_iam_role.lambda_exec.name]
-  policy_arn = "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess"
-}
-
-# LAMBDA
 resource "aws_lambda_function" "list_scheduled_task" {
   filename      = "${path.module}/../lambda/listScheduledTask.zip"
   function_name = "listScheduledTask"
   role          = aws_iam_role.lambda_exec.arn
-  handler       = "listScheduledTask.listScheduledTask"
+  handler       = "listScheduledTask.lambda_handler"
   runtime       = "python3.8"
 }
 
-data "archive_file" "list_lambda_zip" {
-  type        = "zip"
-  source_file = "${path.module}/../lambda/listScheduledTask.py"
-  output_path = "${path.module}/../lambda/listScheduledTask.zip"
+resource "aws_lambda_function" "execute_scheduled_task" {
+  filename      = "${path.module}/../lambda/executeScheduledTask.zip"
+  function_name = "executeScheduledTask"
+  role          = aws_iam_role.lambda_exec.arn
+  handler       = "executeScheduledTask.lambda_handler"
+  runtime       = "python3.8"
+}
+
+# Configuración de IAM
+resource "aws_iam_role" "lambda_exec" {
+  name               = "lambda_exec_role"
+  assume_role_policy = file("lambda-policy.json")
+}
+
+resource "aws_iam_policy" "lambda_policy_db_access" {
+  name        = "lambda_policy_db_access"
+  description = "Policy for Lambda function to interact with DynamoDB"
+  policy      = file("${path.module}/put-policy.json")
 }
 
 resource "aws_iam_policy" "list_lambda_policy" {
   name        = "list_lambda_policy"
   description = "Policy for Lambda function to read from DynamoDB"
+  policy      = file("scan-policy.json")
+}
 
-  policy = file("scan-policy.json")
+resource "aws_iam_policy" "execute_lambda_policy" {
+  name        = "execute_lambda_policy"
+  description = "Policy for Lambda function to write to S3"
+  policy      = file("event-policy.json")
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_policy_attachment" {
+  policy_arn = aws_iam_policy.lambda_policy_db_access.arn
+  role       = aws_iam_role.lambda_exec.name
 }
 
 resource "aws_iam_role_policy_attachment" "list_lambda_policy_attachment" {
@@ -112,30 +130,17 @@ resource "aws_iam_role_policy_attachment" "list_lambda_policy_attachment" {
   role       = aws_iam_role.lambda_exec.name
 }
 
-resource "aws_lambda_function" "execute_scheduled_task" {
-  filename      = "${path.module}/../lambda/executeScheduledTask.zip"
-  function_name = "executeScheduledTask"
-  role          = aws_iam_role.lambda_exec.arn
-  handler       = "executeScheduledTask.executeScheduledTask"
-  runtime       = "python3.8"
-}
-
-data "archive_file" "execute_lambda_zip" {
-  type        = "zip"
-  source_file =  "${path.module}/../lambda/executeScheduledTask.py"
-  output_path =  "${path.module}/../lambda/executeScheduledTask.zip"
-}
-
-resource "aws_iam_policy" "execute_lambda_policy" {
-  name        = "execute_lambda_policy"
-  description = "Policy for Lambda function to write to S3"
-
-  policy = file("event-policy.json")
-}
-
+# Configuración de CloudWatch Event Rule y Target
 resource "aws_cloudwatch_event_rule" "every_minute_rule" {
   name                = "every-minute"
   schedule_expression = "rate(1 minute)"
+}
+
+resource "aws_lambda_permission" "eventbridge_lambda_permission" {
+  statement_id  = "AllowExecutionFromEventBridge"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.execute_scheduled_task.function_name
+  principal     = "events.amazonaws.com"
 }
 
 resource "aws_cloudwatch_event_target" "execute_scheduled_task_target" {
@@ -143,7 +148,7 @@ resource "aws_cloudwatch_event_target" "execute_scheduled_task_target" {
   arn  = aws_lambda_function.execute_scheduled_task.arn
 }
 
-# TASK API
+# Configuración de API Gateway
 resource "aws_api_gateway_rest_api" "task_api" {
   name        = "TaskAPI"
   description = "API Gateway for TaskAPI"
@@ -168,13 +173,12 @@ resource "aws_api_gateway_method" "create_task_method" {
   authorization = "NONE"
 }
 
-resource "aws_lambda_permission" "apigw_lambda" {
+resource "aws_lambda_permission" "apigw_create_task_lambda" {
   statement_id  = "AllowExecutionFromAPIGateway"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.create_scheduled_task.function_name
   principal     = "apigateway.amazonaws.com"
-
-  source_arn = aws_api_gateway_rest_api.task_api.execution_arn
+  source_arn    = "${aws_api_gateway_rest_api.task_api.execution_arn}/createtask/*"
 }
 
 resource "aws_api_gateway_method" "list_task_method" {
@@ -182,6 +186,14 @@ resource "aws_api_gateway_method" "list_task_method" {
   resource_id   = aws_api_gateway_resource.list_task_resource.id
   http_method   = "GET"
   authorization = "NONE"
+}
+
+resource "aws_lambda_permission" "apigw_list_task_lambda" {
+  statement_id  = "AllowExecutionFromAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.list_scheduled_task.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.task_api.execution_arn}/listtask/*"
 }
 
 resource "aws_api_gateway_integration" "create_task_integration" {
