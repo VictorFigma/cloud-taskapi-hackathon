@@ -159,7 +159,7 @@ resource "aws_cloudwatch_event_rule" "every_minute_rule" {
 resource "aws_lambda_permission" "eventbridge_lambda_permission" {
   statement_id  = "AllowExecutionFromEventBridge"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.execute_scheduled_task.function_name
+  function_name = aws_lambda_function.execute_scheduled_task.arn
   principal     = "events.amazonaws.com"
 }
 
@@ -177,13 +177,13 @@ resource "aws_api_gateway_rest_api" "task_api" {
 resource "aws_api_gateway_resource" "create_task_resource" {
   rest_api_id = aws_api_gateway_rest_api.task_api.id
   parent_id   = aws_api_gateway_rest_api.task_api.root_resource_id
-  path_part   = "createtask"
+  path_part   = "/createtask"
 }
 
 resource "aws_api_gateway_resource" "list_task_resource" {
   rest_api_id = aws_api_gateway_rest_api.task_api.id
   parent_id   = aws_api_gateway_rest_api.task_api.root_resource_id
-  path_part   = "listtask"
+  path_part   = "/listtask"
 }
 
 resource "aws_api_gateway_method" "create_task_method" {
@@ -193,14 +193,6 @@ resource "aws_api_gateway_method" "create_task_method" {
   authorization = "NONE"
 }
 
-resource "aws_lambda_permission" "apigw_create_task_lambda" {
-  statement_id  = "AllowExecutionFromAPIGateway"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.create_scheduled_task.function_name
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_api_gateway_rest_api.task_api.execution_arn}/createtask/*"
-}
-
 resource "aws_api_gateway_method" "list_task_method" {
   rest_api_id   = aws_api_gateway_rest_api.task_api.id
   resource_id   = aws_api_gateway_resource.list_task_resource.id
@@ -208,12 +200,20 @@ resource "aws_api_gateway_method" "list_task_method" {
   authorization = "NONE"
 }
 
+resource "aws_lambda_permission" "apigw_create_task_lambda" {
+  statement_id  = "AllowExecutionFromAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.create_scheduled_task.arn
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.task_api.execution_arn}/POST/createtask"
+}
+
 resource "aws_lambda_permission" "apigw_list_task_lambda" {
   statement_id  = "AllowExecutionFromAPIGateway"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.list_scheduled_task.function_name
+  function_name = aws_lambda_function.list_scheduled_task.arn
   principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_api_gateway_rest_api.task_api.execution_arn}/listtask/*"
+  source_arn    = "${aws_api_gateway_rest_api.task_api.execution_arn}/GET/listtask"
 }
 
 resource "aws_api_gateway_integration" "create_task_integration" {
@@ -221,8 +221,8 @@ resource "aws_api_gateway_integration" "create_task_integration" {
   resource_id             = aws_api_gateway_resource.create_task_resource.id
   http_method             = aws_api_gateway_method.create_task_method.http_method
   integration_http_method = "POST"
-  type                    = "AWS"
-  uri                     = aws_lambda_function.create_scheduled_task.invoke_arn
+  type                    = "HTTP"
+  uri                     = "http://localhost:4566/createtask"
 }
 
 resource "aws_api_gateway_integration" "list_task_integration" {
@@ -230,6 +230,6 @@ resource "aws_api_gateway_integration" "list_task_integration" {
   resource_id             = aws_api_gateway_resource.list_task_resource.id
   http_method             = aws_api_gateway_method.list_task_method.http_method
   integration_http_method = "GET"
-  type                    = "AWS"
-  uri                     = aws_lambda_function.list_scheduled_task.invoke_arn
+  type                    = "HTTP"
+  uri                     = "http://localhost:4566/listtask"
 }
