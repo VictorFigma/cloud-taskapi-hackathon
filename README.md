@@ -46,7 +46,7 @@ This is a "ServerlessTasker" program that stores tasks using an API (TaskAPI). T
 # What Does the Program Do?
 
 - Stores tasks via **POST** to `http://localhost:4566/createtask`. You must specify the following fields: `task_name`, `cron_expression`.
-- Retrieves the list of stores tasks via **GET**: `http://localhost:4566/listtask`.
+- Retrieves the list of stored tasks via **GET**: `http://localhost:4566/listtask`.
 - Automatically creates a txt file in a S3 bucket every minute.
 
 # Contribution and State of Development
