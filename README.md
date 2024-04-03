@@ -1,5 +1,5 @@
 # About the project
-You can check the hackathon details here: [here](challenge.md).
+You can check the hackathon details [here](challenge.md).
 
 # TODO
 

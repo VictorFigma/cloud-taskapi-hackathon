@@ -1,12 +1,11 @@
 import boto3
 import json
-from datetime import datetime
 
 s3 = boto3.client('s3', endpoint_url='http://localhost:4566')
 
-def executeScheduledTask(event, context):
+def lambda_handler(event, context):
     bucket_name = 'taskstorage'
-    object_key = f"task_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.txt"
+    object_key = "task.txt"
     s3.put_object(Bucket=bucket_name, Key=object_key, Body="New task created")
 
     return {

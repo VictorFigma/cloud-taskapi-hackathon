@@ -1,4 +1,4 @@
-# Configuración de proveedor
+# Config
 provider "aws" {
   access_key                  = "test"
   secret_key                  = "test"
@@ -19,7 +19,7 @@ provider "aws" {
   }
 }
 
-# Configuración de S3 Bucket
+# S3 Bucket
 resource "aws_s3_bucket" "taskstorage" {
   bucket = "taskstorage"
 
@@ -28,7 +28,7 @@ resource "aws_s3_bucket" "taskstorage" {
   }
 }
 
-# Configuración de DynamoDB
+# DynamoDB
 resource "aws_dynamodb_table" "DynamoDB" {
   name           = "DynamoDB"
   billing_mode   = "PAY_PER_REQUEST"
@@ -85,7 +85,7 @@ data "archive_file" "execute_lambda_zip" {
   output_path =  "${path.module}/../lambda/executeScheduledTask.zip"
 }
 
-# Configuración de Lambda
+# Lambdas
 resource "aws_lambda_function" "create_scheduled_task" {
   filename      = "${path.module}/../lambda/createScheduledTask.zip"
   function_name = "createScheduledTask"
@@ -116,7 +116,7 @@ resource "aws_lambda_function" "execute_scheduled_task" {
   runtime       = "python3.8"
 }
 
-# Configuración de IAM
+# IAM
 resource "aws_iam_role" "lambda_exec" {
   name               = "lambda_exec_role"
   assume_role_policy = file("${path.module}/lambda-policy.json")
@@ -150,7 +150,12 @@ resource "aws_iam_role_policy_attachment" "list_lambda_policy_attachment" {
   role       = aws_iam_role.lambda_exec.name
 }
 
-# Configuración de CloudWatch Event Rule y Target
+resource "aws_iam_role_policy_attachment" "execute_lambda_policy_attachment" {
+  policy_arn = aws_iam_policy.execute_lambda_policy.arn
+  role       = aws_iam_role.lambda_exec.name
+}
+
+# CloudWatch
 resource "aws_cloudwatch_event_rule" "every_minute_rule" {
   name                = "every-minute"
   schedule_expression = "rate(1 minute)"
@@ -168,7 +173,7 @@ resource "aws_cloudwatch_event_target" "execute_scheduled_task_target" {
   arn  = aws_lambda_function.execute_scheduled_task.arn
 }
 
-# Configuración de API Gateway
+# API Gateway
 resource "aws_api_gateway_rest_api" "task_api" {
   name        = "TaskAPI"
   description = "API Gateway for TaskAPI"
@@ -177,13 +182,13 @@ resource "aws_api_gateway_rest_api" "task_api" {
 resource "aws_api_gateway_resource" "create_task_resource" {
   rest_api_id = aws_api_gateway_rest_api.task_api.id
   parent_id   = aws_api_gateway_rest_api.task_api.root_resource_id
-  path_part   = "/createtask"
+  path_part   = "createtask"
 }
 
 resource "aws_api_gateway_resource" "list_task_resource" {
   rest_api_id = aws_api_gateway_rest_api.task_api.id
   parent_id   = aws_api_gateway_rest_api.task_api.root_resource_id
-  path_part   = "/listtask"
+  path_part   = "listtask"
 }
 
 resource "aws_api_gateway_method" "create_task_method" {
